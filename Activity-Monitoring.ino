@@ -43,15 +43,16 @@ void setup() {
   Serial.print("Initializing SD card...");
 
   if (!SD.begin(ChipSelect_SD)) {
-    Serial.println("initialization failed!");
+    Serial.println("Initialization failed!");
     while (1);
   }
-  Serial.println("initialization done.");
+  Serial.println("Initialization done");
   Serial.println("Creating GPS_data.txt...");
   myFile = SD.open("GPS_data.txt", FILE_WRITE);
+   Serial.println("File has been created");
   
   if (myFile) {
-    myFile.println( "EMG, ECG, T, Lat, Long, Alt, Date, Time\r\n");
+    myFile.println("EMG, ECG, T, Lat, Long, Alt, Date, Time\r\n");
     myFile.close();
   } 
   else
@@ -105,7 +106,7 @@ void refresh_location() {
 }
 
 void log_to_file() {
-    static unsigned int ctrl = 4294967295;
+    static int ctrl = 100000;
     char sep = ",";
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
     //Order: Muscle, Hearth, Temp, Latitude, Longitude, Altitude, Date, Time
@@ -115,9 +116,11 @@ void log_to_file() {
         myFile.print(analogRead(ECG));
         myFile.print(sep);
         myFile.print(analogRead(Temperature));
+        Serial.println("logged body data");
+        Serial.println(ctrl);
         --ctrl;
 
-        if ((ctrl = 0)) {
+        if ((ctrl <= 0)) {
             refresh_location();
             myFile.print(sep);
             myFile.print(latitude, 6);
@@ -127,7 +130,8 @@ void log_to_file() {
             myFile.print(altitude, 4);
             myFile.print(sep);
             myFile.print(get_date_and_time());
-            ctrl = 500000;
+            Serial.println("logged GPS data");
+            ctrl = 100000;
         }
 
         myFile.print("\r\n");
@@ -147,4 +151,3 @@ void loop() {
   if ((SerialGPS.available() > 0) && (gps.encode(SerialGPS.read())))
       log_to_file();
 }
-
