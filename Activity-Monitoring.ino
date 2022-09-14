@@ -17,7 +17,6 @@ const unsigned int ECG = A1;
 const unsigned int Temperature = A2;
 
 // Other
-int ctrl = 100000;
 double latitude;
 double longitude;
 double altitude;
@@ -31,7 +30,7 @@ TinyGPSPlus gps;
 
 SoftwareSerial SerialGPS(RXPin, TXPin);
 
-String Latitude, Longitude, Altitude, day, month, year,
+String Latitude, Longitude, Altitude, day, month, year, 
        hour, minute, second, Date, Time, Data, DateTime;
 
 /************************************************************
@@ -50,11 +49,11 @@ void setup() {
   Serial.println("initialization done.");
   Serial.println("Creating GPS_data.txt...");
   myFile = SD.open("GPS_data.txt", FILE_WRITE);
- 
+  
   if (myFile) {
-    myFile.println( "Latitude, Longitude, Altitude, Date and Time, Muscle, Hearth, Temperature(R) \r\n");
+    myFile.println( "EMG, ECG, T, Lat, Long, Alt, Date, Time\r\n");
     myFile.close();
-  }
+  } 
   else
     Serial.println("error opening GPS_data.txt");
 
@@ -64,7 +63,7 @@ void setup() {
 /************************************************************
                         Obtain GPS data
  ************************************************************/
-String obtain_date_and_time() {
+String get_date_and_time() {
     if (gps.date.isValid()) {
         month = gps.date.month();
         day = gps.date.day();
@@ -74,8 +73,6 @@ String obtain_date_and_time() {
         Serial.print("Date ");
         Serial.println(Date);
     }
-    else
-      Serial.println("Invalid date");
     if (gps.time.isValid()) {
         if (gps.time.hour() < 10) ;
             hour = gps.time.hour();
@@ -85,68 +82,56 @@ String obtain_date_and_time() {
             second = gps.time.second();
         Time = hour + ":" + minute + ":" + second;
 
-        Serial.print("Time ");
+        Serial.print(" Time \r\n");
         Serial.println(Time);
     }
-    else
-      Serial.println("Invalid Time");
   String DateTime = Date + "," + Time;
   return DateTime;
 }
 
-void obtain_location() {
+void refresh_location() {
   if (gps.location.isValid()) {
     latitude = gps.location.lat();
     longitude = gps.location.lng();
     altitude = gps.altitude.meters();
 
+    Serial.print("Lat: ");
     Serial.print(latitude);
+    Serial.print(" Lon: ");
     Serial.print(longitude);
+    Serial.print(" Alt: \r\n");
     Serial.println(altitude);
   }
-  else
-      Serial.println("Invalid Location");
 }
 
 void log_to_file() {
+    static unsigned int ctrl = 4294967295;
     char sep = ",";
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
-    //Order: Latitude, Longitude, Altitude, Date and Time, Muscle, Hearth, Temp
-    if ((myFile) && (ctrl <= 0)) {
-        obtain_location();
-        obtain_date_and_time();
-
-        myFile.print(latitude, 6);
-        myFile.print(sep);
-        myFile.print(longitude, 6);
-        myFile.print(sep);
-        myFile.print(altitude, 4);
-        myFile.print(sep);
-        myFile.print(obtain_date_and_time());
-        myFile.print(sep);
+    //Order: Muscle, Hearth, Temp, Latitude, Longitude, Altitude, Date, Time
+    if (myFile){
         myFile.print(analogRead(EMG));
         myFile.print(sep);
         myFile.print(analogRead(ECG));
         myFile.print(sep);
         myFile.print(analogRead(Temperature));
-        myFile.print("\r\n");
-        myFile.close();
-        ctrl = 100000;
-    }
-    if ((myFile) && (ctrl > 0)) {
-        myFile.print(sep);
-        myFile.print(sep);
-        myFile.print(sep);
-        myFile.print(sep);
-        myFile.print(analogRead(EMG));
-        myFile.print(sep);
-        myFile.print(analogRead(ECG));
-        myFile.print(sep);
-        myFile.print(analogRead(Temperature));
-        myFile.print("\r\n");
-        myFile.close();
         --ctrl;
 
+        if ((ctrl = 0)) {
+            refresh_location();
+            myFile.print(sep);
+            myFile.print(latitude, 6);
+            myFile.print(sep);
+            myFile.print(longitude, 6);
+            myFile.print(sep);
+            myFile.print(altitude, 4);
+            myFile.print(sep);
+            myFile.print(get_date_and_time());
+            ctrl = 500000;
+        }
+
+        myFile.print("\r\n");
+        myFile.close();
     }
 }
 
@@ -154,13 +139,12 @@ void log_to_file() {
                             Loop
  ************************************************************/
 void loop() {
-  while (SerialGPS.available() > 0)
-    if (gps.encode(SerialGPS.read()))
-      log_to_file();
-
   if (millis() > 5000 && gps.charsProcessed() < 10){
-    Serial.println("GPS NOT DETECTED!");
-    while(true);
+    Serial.println("GPS not detected, waiting 10 sec...");
+    delay (10000);
   }
+
+  if ((SerialGPS.available() > 0) && (gps.encode(SerialGPS.read())))
+      log_to_file();
 }
 
