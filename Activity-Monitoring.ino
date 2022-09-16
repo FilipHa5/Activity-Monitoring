@@ -18,9 +18,9 @@ constexpr unsigned int TEMPERATURE_PIN = A2;
 // Other
 float latitude, longitude, altitude;
 int day, month, year, hour, minute, second;
-const int array_size = 100;
+constexpr unsigned int array_size = 40;
 
-float EMG_arr[array_size], ECG_arr[array_size];
+int EMG_arr[array_size], ECG_arr[array_size];
 
 // Objects
 File myFile;
@@ -36,9 +36,9 @@ void setup() {
     Serial.print("Initializing SD card...");
     if (!SD.begin(CS_SD)) {
         Serial.println("Initialization failed!");
-        return 0;
     }
     Serial.println("Creating GPS_data.txt...");
+    myFile.close();
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
     Serial.println("File has been created");
 
@@ -96,48 +96,51 @@ void refresh_location() {
 }
 
 void fill_arrays(){
-	for (int i=0; i<array_size; ++i){
-		EMG_arr[i] = analogRead(EMG);
-		ECG_arr[i] = analogRead(ECG);
-		delay(1);
-	}
+  for (int i=0; i<array_size; ++i){
+    EMG_arr[i] = analogRead(EMG);
+    ECG_arr[i] = analogRead(ECG);
+    delay(1);
+    Serial.println("Filled arrays");
+  }
 }
 
 void log_data(){
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
-	char sep = ',';
+  char sep = ',';
     if (myFile) {
-		for (int i=0; i<array_size; ++i){
-			myFile.print("\r\n");
-			myFile.print(EMG_arr[i]);
-			myFile.print(sep);
-			myFile.print(ECG_arr[i]);
-		}
-		if (gps.encode(Serial.read())) {
-			myFile.print(sep);
-			myFile.print(analogRead(TEMPERATURE_PIN));
-			myFile.print(sep);
-			myFile.print(latitude, 6);
-			myFile.print(sep);
-			myFile.print(longitude, 6);
-			myFile.print(sep);
-			myFile.print(altitude, 4);
-			myFile.print(sep);
-			myFile.print(year);
-			myFile.print('-');
-			myFile.print(month);
-			myFile.print('-');
-			myFile.print(day);
-			myFile.print(sep);
-			myFile.print(hour);
-			myFile.print(':');
-			myFile.print(minute);
-			myFile.print(':');
-			myFile.print(second);
-			Serial.println("logged FULL data");
-		}
-	}
-	myFile.close();
+    for (int i=0; i<array_size; ++i){
+      myFile.print("\r\n");
+      myFile.print(EMG_arr[i]);
+      myFile.print(sep);
+      myFile.print(ECG_arr[i]);
+    }
+    if (true) {
+      refresh_location();
+      refresh_date_and_time();
+      myFile.print(sep);
+      myFile.print(analogRead(TEMPERATURE_PIN));
+      myFile.print(sep);
+      myFile.print(latitude, 6);
+      myFile.print(sep);
+      myFile.print(longitude, 6);
+      myFile.print(sep);
+      myFile.print(altitude, 4);
+      myFile.print(sep);
+      myFile.print(year);
+      myFile.print('-');
+      myFile.print(month);
+      myFile.print('-');
+      myFile.print(day);
+      myFile.print(sep);
+      myFile.print(hour);
+      myFile.print(':');
+      myFile.print(minute);
+      myFile.print(':');
+      myFile.print(second);
+      Serial.println("logged FULL data");
+    }
+  }
+  myFile.close();
 }
 
 /************************************************************
@@ -145,7 +148,8 @@ void log_data(){
 ************************************************************/
 
 void loop() {
-    if ((Serial.available() > 0) {
-		fill_arrays();
-		log_data();
+  if ((Serial.available() > 0) && (gps.encode(Serial.read()))){
+    fill_arrays();
+    log_data();
     }
+  }
