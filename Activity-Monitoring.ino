@@ -18,7 +18,7 @@ constexpr unsigned int TEMPERATURE_PIN = A2;
 // Other
 float latitude, longitude, altitude;
 int day, month, year, hour, minute, second;
-constexpr unsigned int array_size = 40;
+constexpr unsigned int array_size = 20;
 
 int EMG_arr[array_size], ECG_arr[array_size];
 
