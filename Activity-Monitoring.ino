@@ -1,10 +1,11 @@
 #include <SPI.h>
+
 #include <TinyGPS++.h>
 
 #include "SD.h"
 
 /************************************************************
-        Variables and objects declaration
+           Variables and objects declaration
 ************************************************************/
 
 // Pins
@@ -17,38 +18,35 @@ constexpr unsigned int TEMPERATURE_PIN = A2;
 
 // Other
 float latitude, longitude, altitude;
-int day, month, year, hour, minute, second;
-constexpr unsigned int array_size = 20;
-
-int EMG_arr[array_size], ECG_arr[array_size];
+String day, month, year, hour, minute, second, speed, sats, course, hdop;
 
 // Objects
 File myFile;
 TinyGPSPlus gps;
 
 /************************************************************
-              Setup
+                      Setup functions
 ************************************************************/
+int init_SD() {
+    if (!SD.begin(CS_SD)) {
+        Serial.println("Could not begin SD");
+        return 0;
+    } else {
+        myFile = SD.open("GPS_data.txt", FILE_WRITE);
+        if (myFile) {
+            myFile.println("EMG, ECG, T, Lat, Long, Alt[m], Speed[km/k], Course, Sats, hdop, Date, Time\r");
+            myFile.close();
+            return 1;
+        } else {
+            Serial.println("Error opening GPS_data.txt");
+            return 0;
+        }
+    }
+}
 
 void setup() {
     Serial.begin(9600);
-    while (!Serial) delay(10);
-    Serial.print("Initializing SD card...");
-    if (!SD.begin(CS_SD)) {
-        Serial.println("Initialization failed!");
-    }
-    Serial.println("Creating GPS_data.txt...");
-    myFile.close();
-    myFile = SD.open("GPS_data.txt", FILE_WRITE);
-    Serial.println("File has been created");
-
-    if (myFile) {
-        myFile.println("EMG, ECG, T, Lat, Long, Alt, Date, Time\r\n");
-        myFile.close();
-    } else {
-        Serial.println("error opening GPS_data.txt");
-    }
-
+    while (!Serial) delay(10000);
     while (true) {
         if (millis() > 5000 && gps.charsProcessed() < 10) {
             Serial.println("GPS not detected, waiting 10 sec...");
@@ -57,10 +55,22 @@ void setup() {
             break;
         }
     }
+
+    while (true) {
+        Serial.println("Initializing SD card...");
+        if (init_SD() == 0) {
+            Serial.println("Initialization failed!");
+            delay(10000);
+        } else {
+            Serial.println("Initialization done, file has been created");
+            break;
+
+        }
+    }
 }
 
 /************************************************************
-            Obtain GPS data
+                     Obtain GPS data
 ************************************************************/
 void refresh_date_and_time() {
     if (gps.date.isValid()) {
@@ -70,86 +80,65 @@ void refresh_date_and_time() {
     }
     if (gps.time.isValid()) {
         if (gps.time.hour() < 10)
-            ;
+        ;
         hour = gps.time.hour();
         if (gps.time.minute() < 10)
-            ;
+        ;
         minute = gps.time.minute();
         if (gps.time.second() < 10)
-            ;
+        ;
         second = gps.time.second();
     }
 }
 
 void refresh_location() {
     if (gps.location.isValid()) {
-        latitude = gps.location.lat();
+        latitude = (gps.location.lat(), 6);
         longitude = gps.location.lng();
         altitude = gps.altitude.meters();
-        Serial.print("Lat: ");
-        Serial.print(latitude);
-        Serial.print(" Lon: ");
-        Serial.print(longitude);
-        Serial.print(" Alt: \r\n");
-        Serial.println(altitude);
+        speed = gps.speed.kmph();
+        course = gps.course.deg();
+        sats = gps.satellites.value();
+        hdop = gps.hdop.value();
     }
 }
 
-void fill_arrays(){
-  for (int i=0; i<array_size; ++i){
-    EMG_arr[i] = analogRead(EMG);
-    ECG_arr[i] = analogRead(ECG);
-    delay(1);
-    Serial.println("Filled arrays");
-  }
-}
-
-void log_data(){
+void log_full_data() {
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
-  char sep = ',';
+    char sep = ',';
+    String body_data = String(analogRead(EMG)) + sep + String(analogRead(ECG)) + sep;
     if (myFile) {
-    for (int i=0; i<array_size; ++i){
-      myFile.print("\r\n");
-      myFile.print(EMG_arr[i]);
-      myFile.print(sep);
-      myFile.print(ECG_arr[i]);
+        myFile.print("\r\n");
+        myFile.print(body_data);
+        Serial.println(body_data);
+        refresh_location();
+        refresh_date_and_time();
+        String temp_and_gps_data = String(analogRead(TEMPERATURE_PIN)) + sep + String(latitude, 6) + sep + String(longitude, 6) + sep + String(altitude, 4) + ',' +
+            sep + speed + sep + course + sats + sep + hdop + ',' + String(year) + '-' + String(month) + '-' + String(day) + ',' + String(hour) + ':' + String(minute) + ':' + String(second);
+        myFile.print(temp_and_gps_data);
+        Serial.println(temp_and_gps_data);
     }
-    if (true) {
-      refresh_location();
-      refresh_date_and_time();
-      myFile.print(sep);
-      myFile.print(analogRead(TEMPERATURE_PIN));
-      myFile.print(sep);
-      myFile.print(latitude, 6);
-      myFile.print(sep);
-      myFile.print(longitude, 6);
-      myFile.print(sep);
-      myFile.print(altitude, 4);
-      myFile.print(sep);
-      myFile.print(year);
-      myFile.print('-');
-      myFile.print(month);
-      myFile.print('-');
-      myFile.print(day);
-      myFile.print(sep);
-      myFile.print(hour);
-      myFile.print(':');
-      myFile.print(minute);
-      myFile.print(':');
-      myFile.print(second);
-      Serial.println("logged FULL data");
-    }
-  }
-  myFile.close();
+    myFile.close();
+}
+
+void log_body_data(){
+    
 }
 
 /************************************************************
-              Loop
+                           Loop
 ************************************************************/
 
 void loop() {
-  if ((Serial.available() > 0) && (gps.encode(Serial.read()))){
-    fill_arrays();
-    log_data();
+    static int counter = 200;
+    if (counter < 0) && (Serial.available() > 0 && gps.encode(Serial.read())) {
+        log_full_data();
+        counter = 200;
     }
-  }
+}
+}
+else {
+    log_body_data();
+    --counter;
+}
+}
