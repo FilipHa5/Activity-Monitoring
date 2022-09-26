@@ -105,16 +105,17 @@ void refresh_location() {
 
 void log_full_data() {
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
-    char sep = ',';
-    String body_data = String(analogRead(EMG)) + sep + String(analogRead(ECG)) + sep;
+    String body_data = String(analogRead(EMG)) + ',' + String(analogRead(ECG)) + ',';
     if (myFile) {
         myFile.print("\r\n");
         myFile.print(body_data);
         Serial.println(body_data);
         refresh_location();
         refresh_date_and_time();
-        String temp_and_gps_data = String(analogRead(TEMPERATURE_PIN)) + sep + String(latitude, 6) + sep + String(longitude, 6) + sep + String(altitude, 4) + ',' +
-            sep + speed + sep + course + sats + sep + hdop + ',' + String(year) + '-' + String(month) + '-' + String(day) + ',' + String(hour) + ':' + String(minute) + ':' + String(second);
+        String temp_and_gps_data = String(analogRead(TEMPERATURE_PIN)) + ',' + String(latitude, 6) 
+            + ',' + String(longitude, 6) + ',' + String(altitude, 4) + ',' + speed + ',' + course 
+            + ',' + sats + ',' + hdop + ',' + String(year) + '-' + String(month) + '-' + String(day) 
+            + ',' + String(hour) + ':' + String(minute) + ':' + String(second);
         myFile.print(temp_and_gps_data);
         Serial.println(temp_and_gps_data);
     }
@@ -122,7 +123,14 @@ void log_full_data() {
 }
 
 void log_body_data(){
-    
+    myFile = SD.open("GPS_data.txt", FILE_WRITE);
+    String body_data = String(analogRead(EMG)) + ',' + String(analogRead(ECG)) + ',';
+    if (myFile) {
+        myFile.print("\r\n");
+        myFile.print(body_data);
+        Serial.println(body_data);
+    }
+    myFile.close();
 }
 
 /************************************************************
@@ -131,14 +139,12 @@ void log_body_data(){
 
 void loop() {
     static int counter = 200;
-    if (counter < 0) && (Serial.available() > 0 && gps.encode(Serial.read())) {
+    if ((counter < 0) && (Serial.available() > 0) && (gps.encode(Serial.read()))) {
         log_full_data();
         counter = 200;
     }
-}
-}
-else {
-    log_body_data();
-    --counter;
-}
+    else {
+        log_body_data();
+        --counter;
+    }
 }
