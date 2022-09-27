@@ -135,7 +135,8 @@ void loop() {
       log_full_data();
       counter = 200;
     }
+  }
+           
    //else {...} here makes, that only else is executed. 
    //Moving (Serial.available() > 0) && (gps.encode(Serial.read())) to functions or other places in code makes that it doesn't work - logs only time or nothing
-  }
 }
