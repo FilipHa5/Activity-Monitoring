@@ -91,60 +91,73 @@ void refresh_date_and_time() {
     }
 }
 
-void refresh_location() {
-    if (gps.location.isValid()) {
-        latitude = (gps.location.lat(), 6);
-        longitude = gps.location.lng();
-        altitude = gps.altitude.meters();
-        speed = gps.speed.kmph();
-        course = gps.course.deg();
-        sats = gps.satellites.value();
-        hdop = gps.hdop.value();
-    }
-}
-
 void log_full_data() {
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
-    String body_data = String(analogRead(EMG)) + ',' + String(analogRead(ECG)) + ',';
     if (myFile) {
-        myFile.print("\r\n");
-        myFile.print(body_data);
-        Serial.println(body_data);
-        refresh_location();
         refresh_date_and_time();
-        String temp_and_gps_data = String(analogRead(TEMPERATURE_PIN)) + ',' + String(latitude, 6) 
-            + ',' + String(longitude, 6) + ',' + String(altitude, 4) + ',' + speed + ',' + course 
-            + ',' + sats + ',' + hdop + ',' + String(year) + '-' + String(month) + '-' + String(day) 
-            + ',' + String(hour) + ':' + String(minute) + ':' + String(second);
-        myFile.print(temp_and_gps_data);
-        Serial.println(temp_and_gps_data);
+        String body_and_gps_data = String(analogRead(EMG)) + ',' + String(analogRead(ECG)) + ',' + String(analogRead(TEMPERATURE_PIN)) + ',' + String(gps.location.lat(), 6) +
+            ',' + String(gps.location.lng(), 6) + ',' + String(gps.altitude.meters()) + ',' + String(gps.speed.kmph()) + ',' + String(gps.course.deg()) +
+            ',' + String(gps.satellites.value()) + ',' + String(gps.hdop.value()) + ',' + String(year) + '-' + String(month) + '-' + String(day) +
+            ',' + String(hour) + ':' + String(minute) + ':' + String(second);
+        myFile.println(body_and_gps_data);
+        Serial.println(body_and_gps_data);
     }
     myFile.close();
 }
 
-void log_body_data(){
+void log_body_data() {
     myFile = SD.open("GPS_data.txt", FILE_WRITE);
+    int emg_arr[20];
+    int ecg_arr[20];
+    for (int i = 0; i < 20; i++) {
+        emg_arr[i] = analogRead(EMG);
+        ecg_arr[i] = analogRead(ECG);
+        delay(1);
+    }
     String body_data = String(analogRead(EMG)) + ',' + String(analogRead(ECG)) + ',';
     if (myFile) {
-        myFile.print("\r\n");
-        myFile.print(body_data);
-        Serial.println(body_data);
+        for (int i = 0; i < 20; i++) {
+            myFile.print(ecg_arr[i]);
+            myFile.print(',');
+            myFile.print(emg_arr[i]);
+            myFile.print("\n");
+        }
     }
     myFile.close();
+}
+
+void wait_till_serial_available() {
+    while (!Serial.available()) {
+        Serial.println("Waiting for serial. Logged body");
+        log_body_data();
+    }
+    gps.encode(Serial.read());
+    Serial.println("Available!, encoded");
 }
 
 /************************************************************
                            Loop
 ************************************************************/
 
+//this version works, but make logs sequentially (with brakes) - so average sampling rate is too low
+
 void loop() {
-    static int counter = 200;
-    if ((counter < 0) && (Serial.available() > 0) && (gps.encode(Serial.read()))) {
-        log_full_data();
-        counter = 200;
-    }
-    else {
-        log_body_data();
-        --counter;
+    static int counter = 0;
+
+    if (counter == 0) {
+        if ((Serial.available()) > 0) {
+            if ((gps.encode(Serial.read()))) {
+                log_full_data();
+                counter++;
+            }
+        } else {
+            wait_till_serial_available();
+        }
+        if (counter > 0) {
+            for (int i = 0; i < 40; i++) {
+                log_body_data();
+            }
+            counter = 0;
+        }
     }
 }
